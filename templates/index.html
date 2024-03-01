@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .chat-container {
+            max-width: 500px;
+            margin: auto;
+        }
+        .message-from-user {
+            background-color: #DCF8C6;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+        .message-from-api {
+            background-color: #E5E5EA;
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container chat-container">
+        <div id="chat-messages"></div>
+        <div class="input-group mb-3">
+            <input type="text" id="message-input" class="form-control" placeholder="Type your message...">
+            <button class="btn btn-primary" id="send-button">Send</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const chatMessages = document.getElementById('chat-messages');
+            const messageInput = document.getElementById('message-input');
+            const sendButton = document.getElementById('send-button');
+
+            sendButton.addEventListener('click', function () {
+                const message = messageInput.value.trim();
+                if (message !== '') {
+                    sendMessage(message);
+                    messageInput.value = '';
+                }
+            });
+
+            function sendMessage(message) {
+                // Display message from user
+                displayMessage(message, 'message-from-user');
+                // Send message to server
+                axios.post('/api', { message })
+                    .then(response => {
+                        // Display response from server
+                        handleResponse(response.data);
+                    })
+                    .catch(error => {
+                        console.error('Error sending message:', error);
+                        // Display error message
+                        displayMessage('Error: ' + error.response.data.error, 'message-from-api');
+                    });
+            }
+
+            function handleResponse(responseData) {
+                // Check if response data is an object
+                if (typeof responseData === 'object') {
+                    // Log the entire response object to the console
+                    console.log('Response from server:', responseData);
+                    // Check if response data has a 'content' property
+                    if (responseData.hasOwnProperty('content')) {
+                        displayMessage(responseData.content, 'message-from-api');
+                    } else if (responseData.hasOwnProperty('error')) {
+                        // If response contains an error message, display it
+                        displayMessage('Error: ' + responseData.error, 'message-from-api');
+                    } else {
+                        // If 'content' property is missing, try to stringify and display the entire response
+                        displayMessage(JSON.stringify(responseData), 'message-from-api');
+                    }
+                } else {
+                    // If response data is not an object, display it as is
+                    displayMessage(responseData, 'message-from-api');
+                }
+            }
+
+            function displayMessage(message, className) {
+                const messageElement = document.createElement('div');
+                messageElement.classList.add(className);
+                messageElement.innerText = message;
+                chatMessages.appendChild(messageElement);
+                // Scroll to bottom of chat messages
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+        });
+    </script>
+</body>
+</html>
