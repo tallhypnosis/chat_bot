@@ -1,16 +1,18 @@
 from flask import Flask, render_template, request, jsonify
-from openai import OpenAI, RateLimitError
-import os
+import google.generativeai as genai
 from dotenv import load_dotenv
-import time
+import os
 
 app = Flask(__name__)
 
-# Load environment variables
+# Load environment variables from .env file
 load_dotenv()
 
-# Set up OpenAI API credentials
-client = OpenAI(api_key=os.environ.get('OPEN_AI_KEY'))
+# Retrieve the API key from environment variable
+API_KEY = os.getenv("OPEN_AI_KEY")
+
+# Set the API credentials
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "./credentials/key.json"
 
 # Define the default route to return the index
 @app.route("/")
@@ -23,33 +25,47 @@ def api():
     # Get the message from POST request
     message = request.json.get("message")
 
-    # Define initial values for backoff and retry
-    wait_time = 0.1
-    max_retries = 3
-    retries = 0
+    generation_config = {
+        "temperature": 0.9,
+        "top_p": 1,
+        "top_k": 1,
+        "max_output_tokens": 2048
+    }
 
-    while retries < max_retries:
-        try:
-            # Send the message to OpenAI's API and receive the response
-            completion = client.chat.completions.create(
-                messages=[{"role": "user", "content": message}],
-                model="gpt-3.5-turbo"
-            )
+    safety_settings = [
+        {
+            "category": "HARM_CATEGORY_HARASSMENT",
+            "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+            "category": "HARM_CATEGORY_HATE_SPEECH",
+            "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+            "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+        },
+        {
+            "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+            "threshold": "BLOCK_MEDIUM_AND_ABOVE"
+        }
+    ]
 
-            # Return JSON response containing the completion
-            if completion.choices and completion.choices[0].message:
-                return jsonify(completion.choices[0].message)
-            else:
-                return jsonify({'error': 'Failed to generate response!'})
+    model = genai.GenerativeModel(model_name="gemini-1.0-pro",
+                                generation_config=generation_config,
+                                safety_settings=safety_settings)
 
-        except RateLimitError as e:
-            # Rate limit error, retry after exponential backoff
-            wait_time *= 2
-            retries += 1
-            time.sleep(wait_time)
-            continue
+    # Start a chat with the model
+    convo = model.start_chat(history=[])
 
-    return jsonify({'error': 'Exceeded maximum number of retries!'})
+    # Send the message to the model
+    convo.send_message(message)
+
+    # Get the response from the model
+    response = convo.last.text
+
+    # Return JSON response containing the completion
+    return jsonify(response)
 
 if __name__ == '__main__':
     app.run()
