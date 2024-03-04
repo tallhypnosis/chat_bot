@@ -1,0 +1,23 @@
+name: CI/CD Pipeline for Feature Branch
+on:
+  push:
+    branches: [ feature-branch ]
+jobs:
+  build-and-deploy:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Build and push image
+        uses: google-github-actions/build-and-push-docker-image@v2
+        with:
+          project_id: project_id
+          dockerfile: Dockerfile
+      - name: Deploy to Cloud Run
+        uses: google-github-actions/deploy-cloud-run@v2
+        with:
+          project_id: project_id
+          service: chat-app
+          image: gcr.io/project_id
+          port: 8080
